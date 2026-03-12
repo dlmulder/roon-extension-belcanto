@@ -1,6 +1,6 @@
 "use strict";
 
-var McIntosh = require("node-mcintosh"),
+var BelCanto = require("node-belcanto"),
 RoonApi = require("node-roon-api"),
 RoonApiSettings = require('node-roon-api-settings'),
 RoonApiStatus = require('node-roon-api-status'),
@@ -8,12 +8,12 @@ RoonApiVolumeControl = require('node-roon-api-volume-control'),
 RoonApiSourceControl = require('node-roon-api-source-control');
 
 var roon = new RoonApi({
-    extension_id: 'com.stefan747.roon.mcintosh',
-    display_name: 'McIntosh Volume/Source Control',
-    display_version: "1.0.1",
-    publisher: 'Stefan Kruzlik',
-    email: 'stefan.kruzlik@gmail.com',
-    website: 'https://github.com/stefan747/roon-extension-mcintosh',
+    extension_id: 'com.dlmulder.roon.belcanto',
+    display_name: 'BelCanto Volume/Source Control',
+    display_version: "1.0.0",
+    publisher: 'Dave Mulder',
+    email: 'dlmulder@gmail.com',
+    website: 'https://github.com/dlmulder/roon-extension-belcanto',
 });
 
 var mysettings = roon.load_config("settings") || {
@@ -24,7 +24,7 @@ var mysettings = roon.load_config("settings") || {
     startuptime: 7
 };
 
-var mcintosh = {};
+var belcanto = {};
 
 function makelayout(settings) {
     var l = {
@@ -72,7 +72,7 @@ function makelayout(settings) {
     });
     l.layout.push({
         type: "integer",
-        title: "McIntosh USB Vendor ID (VID identifier)",
+        title: "BelCanto USB Vendor ID (VID identifier)",
         setting: "usbVid",
     });
     return l;
@@ -116,23 +116,23 @@ roon.init_services({
 });
 
 function setup() {
-    if (mcintosh.control)
-        mcintosh.control.stop();
+    if (belcanto.control)
+        belcanto.control.stop();
 
-    mcintosh.control = new McIntosh();
+    belcanto.control = new BelCanto();
 
-    mcintosh.control.on('connected', ev_connected);
-    mcintosh.control.on('disconnected', ev_disconnected);
-    mcintosh.control.on('volume', ev_volume);
-    mcintosh.control.on('source', ev_source);
+    belcanto.control.on('connected', ev_connected);
+    belcanto.control.on('disconnected', ev_disconnected);
+    belcanto.control.on('volume', ev_volume);
+    belcanto.control.on('source', ev_source);
 
-    if (mcintosh.source_control) {
-        mcintosh.source_control.destroy();
-        delete (mcintosh.source_control);
+    if (belcanto.source_control) {
+        belcanto.source_control.destroy();
+        delete (belcanto.source_control);
     }
-    if (mcintosh.volume_control) {
-        mcintosh.volume_control.destroy();
-        delete (mcintosh.volume_control);
+    if (belcanto.volume_control) {
+        belcanto.volume_control.destroy();
+        delete (belcanto.volume_control);
     }
 
     var opts = {
@@ -147,22 +147,22 @@ function setup() {
     opts.port = mysettings.serialport;
     opts.baud = parseInt(mysettings.baudrate);
     console.log(opts);
-    mcintosh.control.start(opts);
+    belcanto.control.start(opts);
 }
 
 function ev_connected(status) {
-    let control = mcintosh.control;
+    let control = belcanto.control;
 
-    console.log("[McIntosh Extension] Connected");
+    console.log("[BelCanto Extension] Connected");
 
-    svc_status.set_status("Connected to McIntosh", false);
+    svc_status.set_status("Connected to BelCanto", false);
 
     control.set_volume(mysettings.initialvolume);
     control.set_source(mysettings.setsource);
 
-    mcintosh.volume_control = svc_volume_control.new_device({
+    belcanto.volume_control = svc_volume_control.new_device({
         state: {
-            display_name: "McIntosh",
+            display_name: "BelCanto",
             volume_type: "number",
             volume_min: 0,
             volume_max: 100,
@@ -188,9 +188,9 @@ function ev_connected(status) {
         }
     });
 
-    mcintosh.source_control = svc_source_control.new_device({
+    belcanto.source_control = svc_source_control.new_device({
         state: {
-            display_name: "McIntosh",
+            display_name: "BelCanto",
             supports_standby: true,
             status: control.properties.source == "Standby" ? "standby" : (control.properties.source == mysettings.setsource ? "selected" : "deselected")
         },
@@ -217,51 +217,51 @@ function ev_connected(status) {
 }
 
 function ev_disconnected(status) {
-    let control = mcintosh.control;
+    let control = belcanto.control;
 
-    console.log("[McIntosh Extension] Disconnected");
+    console.log("[BelCanto Extension] Disconnected");
 
-    svc_status.set_status("Could not connect to McIntosh on \"" + mysettings.serialport + "\"", true);
+    svc_status.set_status("Could not connect to BelCanto on \"" + mysettings.serialport + "\"", true);
 
-    if (mcintosh.source_control) {
-        mcintosh.source_control.destroy();
-        delete (mcintosh.source_control);
+    if (belcanto.source_control) {
+        belcanto.source_control.destroy();
+        delete (belcanto.source_control);
     }
-    if (mcintosh.volume_control) {
-        mcintosh.volume_control.destroy();
-        delete (mcintosh.volume_control);
+    if (belcanto.volume_control) {
+        belcanto.volume_control.destroy();
+        delete (belcanto.volume_control);
     }
 }
 
 function ev_volume(val) {
-    let control = mcintosh.control;
-    console.log("[McIntosh Extension] received volume change from device:", val);
-    if (mcintosh.volume_control)
-        mcintosh.volume_control.update_state({
+    let control = belcanto.control;
+    console.log("[BelCanto Extension] received volume change from device:", val);
+    if (belcanto.volume_control)
+        belcanto.volume_control.update_state({
             volume_value: val
         });
 }
 function ev_source(val) {
-    let control = mcintosh.control;
-    console.log("[McIntosh Extension] received source change from device:", val);
-    if (val == "Muted" && mcintosh.volume_control)
-        mcintosh.volume_control.update_state({
+    let control = belcanto.control;
+    console.log("[BelCanto Extension] received source change from device:", val);
+    if (val == "Muted" && belcanto.volume_control)
+        belcanto.volume_control.update_state({
             is_muted: true
         });
-    else if (val == "UnMuted" && mcintosh.volume_control)
-        mcintosh.volume_control.update_state({
+    else if (val == "UnMuted" && belcanto.volume_control)
+        belcanto.volume_control.update_state({
             is_muted: false
         });
-    else if (val == "Standby" && mcintosh.source_control)
-        mcintosh.source_control.update_state({
+    else if (val == "Standby" && belcanto.source_control)
+        belcanto.source_control.update_state({
             status: "standby"
         });
     else {
-        if (mcintosh.volume_control)
-            mcintosh.volume_control.update_state({
+        if (belcanto.volume_control)
+            belcanto.volume_control.update_state({
                 is_muted: false
             });
-        mcintosh.source_control.update_state({
+        belcanto.source_control.update_state({
             status: (val == mysettings.setsource ? "selected" : "deselected")
         });
     }
