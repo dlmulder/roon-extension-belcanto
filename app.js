@@ -18,9 +18,10 @@ var roon = new RoonApi({
 
 var mysettings = roon.load_config("settings") || {
     serialport: "",
-    baudrate: 115200,
+    serialport2: "",
+    baudrate: 9600,
     setsource: 1,
-    initialvolume: 10,
+    initialvolume: 30,
     startuptime: 7
 };
 
@@ -38,6 +39,12 @@ function makelayout(settings) {
         title: "Serial Port",
         maxlength: 256,
         setting: "serialport",
+    });
+    l.layout.push({
+        type: "string",
+        title: "Serial Port 2 (optional)",
+        maxlength: 256,
+        setting: "serialport2",
     });
 
     l.layout.push({
@@ -89,16 +96,14 @@ var svc_settings = new RoonApiSettings(roon, {
         });
 
         if (!isdryrun && !l.has_error) {
-            var oldmode = mysettings.mode;
-            var oldip = mysettings.ip;
             var oldport = mysettings.serialport;
-            var oldbaudrate = mysettings.baudrate;
+            var oldport2 = mysettings.serialport2;
             mysettings = l.values;
             svc_settings.update_settings(l);
             let force = false;
-            if (oldmode != mysettings.mode)
-                force = true;
             if (oldport != mysettings.serialport)
+                force = true;
+            if (oldport2 != mysettings.serialport2)
                 force = true;
             if (force)
                 setup();
@@ -137,8 +142,7 @@ function setup() {
 
     var opts = {
         volume: mysettings.initialvolume,
-        source: mysettings.setsource,
-        usbVid: mysettings.usbVid
+        source: mysettings.setsource
     };
     if (!mysettings.serialport) {
         svc_status.set_status("Not configured, please check settings.", true);
@@ -148,6 +152,17 @@ function setup() {
     opts.baud = parseInt(mysettings.baudrate);
     console.log(opts);
     belcanto.control.start(opts);
+
+    if(mysettings.serialport2) {
+        var opts2 = {
+            volume: mysettings.initialvolume,
+            source: mysettings.setsource
+        };
+        opts2.port = mysettings.serialport2;
+        opts.baud = parseInt(mysettings.baudrate);
+        console.log(opts2);
+        belcanto.control.start(opts2);
+    }
 }
 
 function ev_connected(status) {
@@ -166,7 +181,7 @@ function ev_connected(status) {
             volume_type: "number",
             volume_min: 0,
             volume_max: 100,
-            volume_value: control.properties.volume > 0 ? control.properties.volume : 10,
+            volume_value: -1,
             volume_step: 1.0,
             is_muted: control.properties.source == "Muted"
         },
@@ -191,8 +206,8 @@ function ev_connected(status) {
     belcanto.source_control = svc_source_control.new_device({
         state: {
             display_name: "BelCanto",
-            supports_standby: true,
-            status: control.properties.source == "Standby" ? "standby" : (control.properties.source == mysettings.setsource ? "selected" : "deselected")
+            supports_standby: false,
+            status: "deselected"  // "standby" "selected" "deselected")
         },
         convenience_switch: function (req) {
             if (this.state.status == "standby") {
