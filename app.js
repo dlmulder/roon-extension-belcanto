@@ -22,6 +22,7 @@ var mysettings = roon.load_config("settings") || {
     baudrate: 9600,
     setsource: 1,
     initialvolume: 30,
+    initialdisplay: 0,
     startuptime: 7
 };
 
@@ -68,6 +69,13 @@ function makelayout(settings) {
         min: 0,
         max: 100,
         setting: "initialvolume",
+    });
+
+    l.layout.push({
+        type: "dropdown",
+        title: "Initial Display",
+        values: [{title: "(select display mode)", value: undefined}, {title:"Normal", value: "on"}, {title: "Off", value: "off"}],
+        setting: "initialdisplay",
     });
 
     l.layout.push({
@@ -142,7 +150,8 @@ function setup() {
 
     var opts = {
         volume: mysettings.initialvolume,
-        source: mysettings.setsource
+        source: mysettings.setsource,
+        display: mysettings.initialdisplay
     };
     if (!mysettings.serialport) {
         svc_status.set_status("Not configured, please check settings.", true);
@@ -156,7 +165,8 @@ function setup() {
     if(mysettings.serialport2) {
         var opts2 = {
             volume: mysettings.initialvolume,
-            source: mysettings.setsource
+            source: mysettings.setsource,
+            display: mysettings.initialdisplay
         };
         opts2.port = mysettings.serialport2;
         opts.baud = parseInt(mysettings.baudrate);
@@ -174,6 +184,7 @@ function ev_connected(status) {
 
     control.set_volume(mysettings.initialvolume);
     control.set_source(mysettings.setsource);
+    control.set_display(mysettings.initialdisplay);
 
     belcanto.volume_control = svc_volume_control.new_device({
         state: {
@@ -195,12 +206,12 @@ function ev_connected(status) {
             req.send_complete("Success");
         },
         set_mute: function (req, mode) {
-            if (mode == "on") {
+            if (mode == "on")
                 control.mute(1);
-            } else if (mode == "off")
+            else if (mode == "off")
                 control.mute(0);
             req.send_complete("Success");
-        }
+        },
     });
 
     belcanto.source_control = svc_source_control.new_device({
@@ -213,12 +224,14 @@ function ev_connected(status) {
             if (this.state.status == "standby") {
                 control.power_on();
                 control.set_source(mysettings.setsource);
+                control.set_display(mysettings.initialdisplay);
                 setTimeout(() => {
                     req.send_complete("Success");
                 }, mysettings.startuptime * 1000);
                 control.set_volume(mysettings.initialvolume);
             } else {
                 control.set_source(mysettings.setsource);
+                control.set_display(mysettings.initialdisplay);
                 req.send_complete("Success");
             }
         },
@@ -249,7 +262,6 @@ function ev_disconnected(status) {
 }
 
 function ev_volume(val) {
-    let control = belcanto.control;
     console.log("[BelCanto Extension] received volume change from device:", val);
     if (belcanto.volume_control)
         belcanto.volume_control.update_state({
@@ -257,7 +269,6 @@ function ev_volume(val) {
         });
 }
 function ev_source(val) {
-    let control = belcanto.control;
     console.log("[BelCanto Extension] received source change from device:", val);
     if (val == "Muted" && belcanto.volume_control)
         belcanto.volume_control.update_state({
