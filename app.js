@@ -74,7 +74,7 @@ function makelayout(settings) {
     l.layout.push({
         type: "dropdown",
         title: "Initial Display",
-        values: [{title: "(select display mode)", value: undefined}, {title:"Normal", value: "on"}, {title: "Off", value: "off"}],
+        values: [{title: "(select display mode)", value: undefined}, {title:"Normal", value: true}, {title: "Off", value: false}],
         setting: "initialdisplay",
     });
 
@@ -85,11 +85,7 @@ function makelayout(settings) {
         max: 100,
         setting: "startuptime",
     });
-    l.layout.push({
-        type: "integer",
-        title: "BelCanto USB Vendor ID (VID identifier)",
-        setting: "usbVid",
-    });
+
     return l;
 }
 
@@ -157,22 +153,11 @@ function setup() {
         svc_status.set_status("Not configured, please check settings.", true);
         return;
     }
-    opts.port = mysettings.serialport;
+    opts.port1 = mysettings.serialport;
+    opts.port2 = mysettings.serialport2;
     opts.baud = parseInt(mysettings.baudrate);
     console.log(opts);
     belcanto.control.start(opts);
-
-    if(mysettings.serialport2) {
-        var opts2 = {
-            volume: mysettings.initialvolume,
-            source: mysettings.setsource,
-            display: mysettings.initialdisplay
-        };
-        opts2.port = mysettings.serialport2;
-        opts.baud = parseInt(mysettings.baudrate);
-        console.log(opts2);
-        belcanto.control.start(opts2);
-    }
 }
 
 function ev_connected(status) {
@@ -181,10 +166,6 @@ function ev_connected(status) {
     console.log("[BelCanto Extension] Connected");
 
     svc_status.set_status("Connected to BelCanto", false);
-
-    control.set_volume(mysettings.initialvolume);
-    control.set_source(mysettings.setsource);
-    control.set_display(mysettings.initialdisplay);
 
     belcanto.volume_control = svc_volume_control.new_device({
         state: {
@@ -202,14 +183,14 @@ function ev_connected(status) {
                 newvol = this.state.volume_min;
             else if (newvol > this.state.volume_max)
                 newvol = this.state.volume_max;
-            control.set_volume(newvol);
+            control.request_volume(newvol);
             req.send_complete("Success");
         },
         set_mute: function (req, mode) {
             if (mode == "on")
-                control.mute(1);
+                control.request_mute(true);
             else if (mode == "off")
-                control.mute(0);
+                control.request_mute(false);
             req.send_complete("Success");
         },
     });
@@ -228,7 +209,7 @@ function ev_connected(status) {
                 setTimeout(() => {
                     req.send_complete("Success");
                 }, mysettings.startuptime * 1000);
-                control.set_volume(mysettings.initialvolume);
+                control.request_volume(mysettings.initialvolume);
             } else {
                 control.set_source(mysettings.setsource);
                 control.set_display(mysettings.initialdisplay);
@@ -237,7 +218,6 @@ function ev_connected(status) {
         },
         standby: function (req) {
             this.state.status = "standby";
-            control.power_off();
             req.send_complete("Success");
         }
     });
@@ -245,8 +225,6 @@ function ev_connected(status) {
 }
 
 function ev_disconnected(status) {
-    let control = belcanto.control;
-
     console.log("[BelCanto Extension] Disconnected");
 
     svc_status.set_status("Could not connect to BelCanto on \"" + mysettings.serialport + "\"", true);
