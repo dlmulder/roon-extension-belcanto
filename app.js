@@ -5,7 +5,11 @@ RoonApi = require("node-roon-api"),
 RoonApiSettings = require('node-roon-api-settings'),
 RoonApiStatus = require('node-roon-api-status'),
 RoonApiVolumeControl = require('node-roon-api-volume-control'),
-RoonApiSourceControl = require('node-roon-api-source-control');
+RoonApiSourceControl = require('node-roon-api-source-control'),
+RoonApiTransport = require('node-roon-api-transport')
+
+var core_transport;
+var target_zone;
 
 var roon = new RoonApi({
     extension_id: 'com.dlmulder.roon.belcanto',
@@ -14,6 +18,42 @@ var roon = new RoonApi({
     publisher: 'Dave Mulder',
     email: 'dlmulder@gmail.com',
     website: 'https://github.com/dlmulder/roon-extension-belcanto',
+
+    core_paired: function(core) {
+        core_transport = core.services.RoonApiTransport;
+        core_transport.subscribe_zones((cmd, data) => {
+            if (cmd === "Subscribed") {
+                // Initial full list
+                target_zone = data.zones.find(z => 
+                    z.outputs.some(o => o.display_name === "BelCanto")
+                );
+            } else if (cmd === "Changed") {
+                // Handle updates - check added or changed lists
+                if (data.zones_added) {
+                    let found = data.zones_added.find(z => 
+                        z.outputs.some(o => o.display_name === "BelCanto")
+                    );
+                    if (found) target_zone = found;
+                }
+                
+                if (data.zones_changed) {
+                    let found = data.zones_changed.find(z => 
+                        z.outputs.some(o => o.display_name === "BelCanto")
+                    );
+                    // Update our reference with the latest state (e.g., is_pause_allowed)
+                    if (found) target_zone = found;
+                }
+
+                if (data.zones_removed && target_zone) {
+                    if (data.zones_removed.some(z_id => z_id === target_zone.zone_id)) {
+                        target_zone = undefined;
+                    }
+                }
+            }
+        });
+    },
+    core_unpaired: function(core) {
+    }
 });
 
 var mysettings = roon.load_config("settings") || {
@@ -119,9 +159,11 @@ var svc_settings = new RoonApiSettings(roon, {
 var svc_status = new RoonApiStatus(roon);
 var svc_volume_control = new RoonApiVolumeControl(roon);
 var svc_source_control = new RoonApiSourceControl(roon);
+var svc_transport = new RoonApiTransport(roon);
 
 roon.init_services({
-    provided_services: [svc_volume_control, svc_source_control, svc_settings, svc_status]
+    provided_services: [svc_volume_control, svc_source_control, svc_settings, svc_status],
+    required_services: [RoonApiTransport]
 });
 
 function setup() {
@@ -134,6 +176,9 @@ function setup() {
     belcanto.control.on('disconnected', ev_disconnected);
     belcanto.control.on('volume', ev_volume);
     belcanto.control.on('source', ev_source);
+    belcanto.control.on('play_pause_pressed', () => { send_transport_command('playpause'); });
+    belcanto.control.on('prev_pressed', () => { send_transport_command('previous'); });
+    belcanto.control.on('next_pressed', () => { send_transport_command('next'); });
 
     if (belcanto.source_control) {
         belcanto.source_control.destroy();
@@ -204,15 +249,15 @@ function ev_connected(status) {
         convenience_switch: function (req) {
             if (this.state.status == "standby") {
                 control.power_on();
-                control.set_source(mysettings.setsource);
-                control.set_display(mysettings.initialdisplay);
+                control.request_source(mysettings.setsource);
+                control.request_display(mysettings.initialdisplay);
                 setTimeout(() => {
                     req.send_complete("Success");
                 }, mysettings.startuptime * 1000);
                 control.request_volume(mysettings.initialvolume);
             } else {
-                control.set_source(mysettings.setsource);
-                control.set_display(mysettings.initialdisplay);
+                control.request_source(mysettings.setsource);
+                control.request_display(mysettings.initialdisplay);
                 req.send_complete("Success");
             }
         },
@@ -222,6 +267,17 @@ function ev_connected(status) {
         }
     });
 
+}
+
+function send_transport_command(command) {
+    if (core_transport && target_zone) {
+        // Supported commands: 'play', 'pause', 'playpause', 'stop', 'previous', 'next'
+        core_transport.control(target_zone, command, (err) => {
+            if (err) console.error("Transport error:", err);
+        });
+    } else {
+        console.log("Transport not ready or Zone not found.", core_transport, target_zone);
+    }
 }
 
 function ev_disconnected(status) {
