@@ -251,6 +251,7 @@ function ev_connected(status) {
                 control.power_on();
                 control.request_source(mysettings.setsource);
                 control.request_display(mysettings.initialdisplay);
+                control.request_control(1)
                 setTimeout(() => {
                     req.send_complete("Success");
                 }, mysettings.startuptime * 1000);
@@ -258,6 +259,7 @@ function ev_connected(status) {
             } else {
                 control.request_source(mysettings.setsource);
                 control.request_display(mysettings.initialdisplay);
+                control.request_control(1)
                 req.send_complete("Success");
             }
         },
@@ -281,7 +283,7 @@ function send_transport_command(command) {
 }
 
 function ev_disconnected(status) {
-    console.log("[BelCanto Extension] Disconnected");
+    console.log("[BelCanto Extension] Disconnected", status);
 
     svc_status.set_status("Could not connect to BelCanto on \"" + mysettings.serialport + "\"", true);
 
