@@ -31,14 +31,14 @@ var roon = new RoonApi({
                 // Handle updates - check added or changed lists
                 if (data.zones_added) {
                     let found = data.zones_added.find(z => 
-                        z.outputs.some(o => o.display_name === "BelCanto")
+                        z.outputs.some(o => o.display_name === "Living Room")
                     );
                     if (found) target_zone = found;
                 }
                 
                 if (data.zones_changed) {
                     let found = data.zones_changed.find(z => 
-                        z.outputs.some(o => o.display_name === "BelCanto")
+                        z.outputs.some(o => o.display_name === "Living Room")
                     );
                     // Update our reference with the latest state (e.g., is_pause_allowed)
                     if (found) target_zone = found;
@@ -314,19 +314,6 @@ function ev_source(val) {
         belcanto.volume_control.update_state({
             is_muted: false
         });
-    else if (val == "Standby" && belcanto.source_control)
-        belcanto.source_control.update_state({
-            status: "standby"
-        });
-    else {
-        if (belcanto.volume_control)
-            belcanto.volume_control.update_state({
-                is_muted: false
-            });
-        belcanto.source_control.update_state({
-            status: (val == mysettings.setsource ? "selected" : "deselected")
-        });
-    }
 }
 
 setup();
