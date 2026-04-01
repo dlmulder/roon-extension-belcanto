@@ -177,6 +177,9 @@ function setup() {
     belcanto.control.on('volume', ev_volume);
     belcanto.control.on('source', ev_source);
     belcanto.control.on('play_pause_pressed', () => { send_transport_command('playpause'); });
+    belcanto.control.on('play_pressed', () => { send_transport_command('play'); });
+    belcanto.control.on('pause_pressed', () => { send_transport_command('pause'); });
+    belcanto.control.on('stop_pressed', () => { send_transport_command('stop'); });
     belcanto.control.on('prev_pressed', () => { send_transport_command('previous'); });
     belcanto.control.on('next_pressed', () => { send_transport_command('next'); });
 
